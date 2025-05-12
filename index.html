@@ -138,15 +138,12 @@
                         return;
                     }
 
-                    // Set removeAllDrives checkbox
                     document.getElementById('removeAllDrives').checked = !!config.removeAllDrives;
 
-                    // Clear existing mappings
                     const mappingsDiv = document.getElementById('mappings');
                     mappingsDiv.innerHTML = '';
                     mappingCount = 0;
 
-                    // Add mappings from JSON
                     (config.mappings || []).forEach(mapping => {
                         if (mapping.driveLetter || mapping.networkPath || mapping.groupName || mapping.profileName || mapping.domainSuffix) {
                             addMapping({
@@ -159,7 +156,6 @@
                         }
                     });
 
-                    // Ensure at least one mapping exists
                     if (mappingCount === 0) {
                         addMapping();
                     }
@@ -171,7 +167,7 @@
         }
 
         function getDriveMappingScriptContent(mappings, removeAllDrives) {
-            let scriptContent = `# Remove all existing drive mappings if specified
+            return `# Remove all existing drive mappings if specified
 ${removeAllDrives ? `
 Get-PSDrive -PSProvider FileSystem | Where-Object { $_.DisplayRoot -like '\\\\*' } | ForEach-Object {
     try {
@@ -184,47 +180,57 @@ Get-PSDrive -PSProvider FileSystem | Where-Object { $_.DisplayRoot -like '\\\\*'
 }
 ` : ''}# Define mappings
 $mappings = @(
-`;
-
-            mappings.forEach((mapping, index) => {
-                scriptContent += `    @{ DriveLetter = "${mapping.driveLetter}"; NetworkPath = "${mapping.networkPath}"; GroupName = "${mapping.groupName || 'Domain Users'}"; ProfileName = "${mapping.profileName}"; DomainSuffix = "${mapping.domainSuffix || ''}" }${index < mappings.length - 1 ? ',' : ''}\n`;
-            });
-
-            scriptContent += `)
+${mappings.map((mapping, index) => `    @{ DriveLetter = "${mapping.driveLetter}"; NetworkPath = "${mapping.networkPath}"; GroupName = "${mapping.groupName || 'Domain Users'}"; ProfileName = "${mapping.profileName}"; DomainSuffix = "${mapping.domainSuffix || ''}" }${index < mappings.length - 1 ? ',' : ''}`).join('\n')}
+)
 
 foreach ($mapping in $mappings) {
+    # Validate network path accessibility
+    if (-not (Test-Path $mapping.NetworkPath)) {
+        Write-Host "Network path $($mapping.NetworkPath) is inaccessible. Drive $($mapping.DriveLetter): not mapped."
+        continue
+    }
+
     # Check if the network profile matches the specified profile
-    $networkProfile = (Get-NetConnectionProfile).NetworkCategory
-    if ($networkProfile -eq $mapping.ProfileName) {
+    $networkProfiles = (Get-NetConnectionProfile).NetworkCategory
+    if ($networkProfiles -contains $mapping.ProfileName) {
         # Check domain suffix if specified
-        $domainMatch = $true
-        if ($mapping.DomainSuffix) {
+        $domainMatch = if ($mapping.DomainSuffix) {
             $adapters = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' }
-            $domainMatch = $false
+            $matchFound = $false
             foreach ($adapter in $adapters) {
                 $dnsConfig = Get-DnsClient | Where-Object { $_.InterfaceIndex -eq $adapter.InterfaceIndex }
                 if ($dnsConfig -and $dnsConfig.ConnectionSpecificSuffix -eq $mapping.DomainSuffix) {
-                    $domainMatch = $true
+                    $matchFound = $true
                     break
                 }
             }
+            $matchFound
+        } else {
+            $true
         }
 
         if ($domainMatch) {
-            # Get the current user's domain
+            # Get the current user's domain and SID
             $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent()
             $userName = $currentUser.Name
             $domain = $userName.Split('\\')[0]
+            $userSid = $currentUser.User.Value
 
-            # Check if the user is a member of the specified group (case-insensitive) using whoami /groups
+            # Check if the user is a member of the specified group using WMI
             $group = $mapping.GroupName
             $isMember = $false
             try {
-                $groupList = whoami /groups /fo csv | ConvertFrom-Csv
-                foreach ($groupEntry in $groupList) {
-                    if ($groupEntry.'Group Name' -ieq $group -or $groupEntry.'Group Name' -ieq "$domain\\$group") {
-                        $isMember = $true
-                        break
+                # Query the group (local or domain) using Win32_Group
+                $groupObj = Get-WmiObject -Class Win32_Group -Filter "Name='$group' AND (Domain='$domain' OR Domain='$env:COMPUTERNAME')"
+                if ($groupObj) {
+                    # Query Win32_GroupUser to check if the user is a member
+                    $groupSid = $groupObj.SID
+                    $membership = Get-WmiObject -Class Win32_GroupUser -Filter "GroupComponent=\\"Win32_Group.SID='$groupSid'\\""
+                    foreach ($member in $membership) {
+                        if ($member.PartComponent -match "Win32_UserAccount.SID='$userSid'") {
+                            $isMember = $true
+                            break
+                        }
                     }
                 }
             }
@@ -233,6 +239,18 @@ foreach ($mapping in $mappings) {
             }
 
             if ($isMember) {
+                # Check for existing drive mapping and unmap if necessary
+                if (Get-PSDrive -Name $mapping.DriveLetter -ErrorAction SilentlyContinue) {
+                    try {
+                        Remove-PSDrive -Name $mapping.DriveLetter -Force -ErrorAction Stop
+                        Write-Host "Removed conflicting drive mapping: $($mapping.DriveLetter)"
+                    }
+                    catch {
+                        Write-Host "Failed to remove conflicting drive $($mapping.DriveLetter): $_"
+                        continue
+                    }
+                }
+
                 # Map the drive to the specified network share
                 try {
                     New-PSDrive -Name $mapping.DriveLetter -PSProvider FileSystem -Root $mapping.NetworkPath -Persist -ErrorAction Stop
@@ -255,12 +273,14 @@ foreach ($mapping in $mappings) {
     }
 }
 `;
-            return scriptContent;
         }
 
         function generateScript() {
             const removeAllDrives = document.getElementById('removeAllDrives').checked;
             const mappings = [];
+            const usedDriveLetters = new Set();
+            const reservedDriveLetters = ['A', 'B', 'C'];
+
             for (let i = 0; i < mappingCount; i++) {
                 const driveLetter = document.getElementById(`driveLetter_${i}`)?.value.trim().toUpperCase();
                 const networkPath = document.getElementById(`networkPath_${i}`)?.value.trim();
@@ -268,15 +288,25 @@ foreach ($mapping in $mappings) {
                 const profileName = document.getElementById(`profileName_${i}`)?.value;
                 const domainSuffix = document.getElementById(`domainSuffix_${i}`)?.value.trim();
 
-                if (!driveLetter || !networkPath) continue; // Skip incomplete mappings
+                if (!driveLetter || !networkPath) continue;
 
                 // Validate inputs
                 if (!driveLetter.match(/^[A-Z]$/)) {
                     alert(`Invalid drive letter for mapping ${i + 1}. Please enter a single letter (e.g., G).`);
                     return;
                 }
+                if (reservedDriveLetters.includes(driveLetter)) {
+                    alert(`Drive letter ${driveLetter} is reserved (A, B, C). Please choose another letter for mapping ${i + 1}.`);
+                    return;
+                }
+                if (usedDriveLetters.has(driveLetter)) {
+                    alert(`Duplicate drive letter ${driveLetter} in mapping ${i + 1}. Each mapping must use a unique drive letter.`);
+                    return;
+                }
+                usedDriveLetters.add(driveLetter);
+
                 if (!networkPath.match(/^\\\\[a-zA-Z0-9.-]+\\[^\\]+(\\[^\\]+)*$/)) {
-                    alert(`Invalid network path for mapping ${i + 1}. Please enter a valid path (e.g., \\\\srvdc01.company.local\\company\\share).`);
+                    alert(`Invalid network path for mapping ${i + 1}. Please enter a valid path (e.g., \\srvdc01.company.local\\company\\share).`);
                     return;
                 }
                 if (groupName && !groupName.match(/^[a-zA-Z0-9\s_-]+$/)) {
@@ -302,7 +332,6 @@ foreach ($mapping in $mappings) {
 
             const scriptContent = getDriveMappingScriptContent(mappings, removeAllDrives);
 
-            // Create and download the file
             const blob = new Blob([scriptContent], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -317,6 +346,9 @@ foreach ($mapping in $mappings) {
         function generateIntuneScript() {
             const removeAllDrives = document.getElementById('removeAllDrives').checked;
             const mappings = [];
+            const usedDriveLetters = new Set();
+            const reservedDriveLetters = ['A', 'B', 'C'];
+
             for (let i = 0; i < mappingCount; i++) {
                 const driveLetter = document.getElementById(`driveLetter_${i}`)?.value.trim().toUpperCase();
                 const networkPath = document.getElementById(`networkPath_${i}`)?.value.trim();
@@ -324,15 +356,24 @@ foreach ($mapping in $mappings) {
                 const profileName = document.getElementById(`profileName_${i}`)?.value;
                 const domainSuffix = document.getElementById(`domainSuffix_${i}`)?.value.trim();
 
-                if (!driveLetter || !networkPath) continue; // Skip incomplete mappings
+                if (!driveLetter || !networkPath) continue;
 
-                // Validate inputs
                 if (!driveLetter.match(/^[A-Z]$/)) {
                     alert(`Invalid drive letter for mapping ${i + 1}. Please enter a single letter (e.g., G).`);
                     return;
                 }
+                if (reservedDriveLetters.includes(driveLetter)) {
+                    alert(`Drive letter ${driveLetter} is reserved (A, B, C). Please choose another letter for mapping ${i + 1}.`);
+                    return;
+                }
+                if (usedDriveLetters.has(driveLetter)) {
+                    alert(`Duplicate drive letter ${driveLetter} in mapping ${i + 1}. Each mapping must use a unique drive letter.`);
+                    return;
+                }
+                usedDriveLetters.add(driveLetter);
+
                 if (!networkPath.match(/^\\\\[a-zA-Z0-9.-]+\\[^\\]+(\\[^\\]+)*$/)) {
-                    alert(`Invalid network path for mapping ${i + 1}. Please enter a valid path (e.g., \\\\srvdc01.company.local\\company\\share).`);
+                    alert(`Invalid network path for mapping ${i + 1}. Please enter a valid path (e.g., \\srvdc01.company.local\\company\\share).`);
                     return;
                 }
                 if (groupName && !groupName.match(/^[a-zA-Z0-9\s_-]+$/)) {
@@ -356,13 +397,9 @@ foreach ($mapping in $mappings) {
                 return;
             }
 
-            // Generate the drive mapping script content
             const driveMappingScript = getDriveMappingScriptContent(mappings, removeAllDrives);
-
-            // Encode the drive mapping script to Base64
             const base64Script = btoa(driveMappingScript);
 
-            // Generate the Intune script
             const intuneScriptContent = `
 # Check if running in SYSTEM context
 $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
@@ -372,6 +409,14 @@ if ($currentUser -eq "NT AUTHORITY\\SYSTEM") {
         $scriptDir = "C:\\ProgramData\\DriveMapper"
         if (-not (Test-Path $scriptDir)) {
             New-Item -Path $scriptDir -ItemType Directory -Force | Out-Null
+            # Set permissions to SYSTEM and Administrators only
+            $acl = Get-Acl $scriptDir
+            $acl.SetAccessRuleProtection($true, $false)
+            $rule = New-Object System.Security.AccessControl.FileSystemAccessRule("NT AUTHORITY\\SYSTEM", "FullControl", "ContainerInherit, ObjectInherit", "None", "Allow")
+            $acl.AddAccessRule($rule)
+            $rule = New-Object System.Security.AccessControl.FileSystemAccessRule("Administrators", "FullControl", "ContainerInherit, ObjectInherit", "None", "Allow")
+            $acl.AddAccessRule($rule)
+            Set-Acl $scriptDir $acl
         }
 
         # Save the Base64-encoded drive mapping script to C:\\ProgramData\\DriveMapper\\DriveMap.ps1
@@ -380,13 +425,19 @@ if ($currentUser -eq "NT AUTHORITY\\SYSTEM") {
         $scriptContent = [System.Text.Encoding]::UTF8.GetString($scriptBytes)
         $scriptPath = "$scriptDir\\DriveMap.ps1"
         [System.IO.File]::WriteAllText($scriptPath, $scriptContent)
-        Write-Host "Drive mapping script saved to $scriptPath"
+        # Set file permissions to SYSTEM and Administrators only
+        $acl = Get-Acl $scriptPath
+        $acl.SetAccessRuleProtection($true, $false)
+        $rule = New-Object System.Security.AccessControl.FileSystemAccessRule("NT AUTHORITY\\SYSTEM", "FullControl", "Allow")
+        $acl.AddAccessRule($rule)
+        $rule = New-Object System.Security.AccessControl.FileSystemAccessRule("Administrators", "FullControl", "Allow")
+        $acl.AddAccessRule($rule)
+        Set-Acl $scriptPath $acl  Write-Host "Drive mapping script saved to $scriptPath"
 
         # Create a scheduled task to run the drive mapping script at user logon
         $taskName = "DriveMappingTask"
         $taskDescription = "Runs drive mapping script at user logon"
-        # Execute PowerShell with the drive mapping script
-        $action = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File \\"$scriptPath\\"" -WorkingDirectory $scriptDir
+        $action = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-NoProfile -ExecutionPolicy RemoteSigned -File \\"$scriptPath\\"" -WorkingDirectory $scriptDir
         $trigger = New-ScheduledTaskTrigger -AtLogOn
         $principal = New-ScheduledTaskPrincipal -GroupId "Users" -RunLevel Limited
         $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
@@ -405,7 +456,6 @@ else {
 }
 `;
 
-            // Create and download the Intune script
             const blob = new Blob([intuneScriptContent], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
