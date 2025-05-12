@@ -396,11 +396,17 @@ foreach ($mapping in $mappings) {
 $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 if ($currentUser -eq "NT AUTHORITY\\SYSTEM") {
     try {
-        # Save the Base64-encoded drive mapping script to C:\\Users\\Public\\Documents\\DriveMap.ps1
+        # Create the DriveMapper directory if it doesn't exist
+        $scriptDir = "C:\\ProgramData\\DriveMapper"
+        if (-not (Test-Path $scriptDir)) {
+            New-Item -Path $scriptDir -ItemType Directory -Force | Out-Null
+        }
+
+        # Save the Base64-encoded drive mapping script to C:\\ProgramData\\DriveMapper\\DriveMap.ps1
         $base64Script = "${base64Script}"
         $scriptBytes = [System.Convert]::FromBase64String($base64Script)
         $scriptContent = [System.Text.Encoding]::UTF8.GetString($scriptBytes)
-        $scriptPath = "C:\\Users\\Public\\Documents\\DriveMap.ps1"
+        $scriptPath = "$scriptDir\\DriveMap.ps1"
         [System.IO.File]::WriteAllText($scriptPath, $scriptContent)
         Write-Host "Drive mapping script saved to $scriptPath"
 
