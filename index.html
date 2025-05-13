@@ -1,601 +1,76 @@
-<script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
 
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-        </script><script type="text/javascript">
-    var gk_isXlsx = false;
-    var gk_xlsxFileLookup = {};
-    var gk_fileData = {};
-    function filledCell(cell) {
-        return cell !== '' && cell != null;
-    }
-    function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            if (typeof XLSX === 'undefined') {
-                console.error('XLSX library is not loaded.');
-                return "";
-            }
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                    row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                    headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex));
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error('Error processing XLSX file:', e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-    }
-</script>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PowerShell Drive Mapping Script Generator</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen">
-    <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-lg">
-        <h1 class="text-2xl font-bold mb-4 text-center">Generate PowerShell Drive Mapping Script</h1>
-        <div class="mb-4">
-            <label class="flex items-center">
-                <input type="checkbox" id="removeAllDrives" class="mr-2">
-                <span class="text-sm font-medium text-gray-700">Remove all existing drive mappings</span>
-            </label>
-        </div>
-        <div id="mappings" class="space-y-4">
-            <div class="mapping border p-4 rounded-md">
-                <div class="mb-4">
-                    <label for="driveLetter_0" class="block text-sm font-medium text-gray-700">Drive Letter</label>
-                    <input type="text" id="driveLetter_0" placeholder="e.g., G" class="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div class="mb-4">
-                    <label for="networkPath_0" class="block text-sm font-medium text-gray-700">Network Path</label>
-                    <input type="text" id="networkPath_0" placeholder="e.g., \\srvdc01.company.local\company\share" class="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div class="mb-4">
-                    <label for="groupName_0" class="block text-sm font-medium text-gray-700">Group Name (Optional)</label>
-                    <input type="text" id="groupName_0" placeholder="e.g., Domain Users" class="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div class="mb-4">
-                    <label for="profileName_0" class="block text-sm font-medium text-gray-700">Network Profile</label>
-                    <select id="profileName_0" class="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="DomainAuthenticated" selected>DomainAuthenticated</option>
-                        <option value="Public">Public</option>
-                        <option value="Private">Private</option>
-                    </select>
-                </div>
-                <div class="mb-4">
-                    <label for="domainSuffix_0" class="block text-sm font-medium text-gray-700">Domain Suffix (Optional)</label>
-                    <input type="text" id="domainSuffix_0" placeholder="e.g., company.local" class="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <button onclick="removeMapping(this)" class="text-red-500 hover:text-red-700 text-sm">Remove Mapping</button>
-            </div>
-        </div>
-        <button onclick="addMapping()" class="mt-4 w-full bg-green-500 text-white p-2 rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500">Add Another Mapping</button>
-        <button onclick="exportConfig()" class="mt-4 w-full bg-yellow-500 text-white p-2 rounded-md hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-500">Export Config to JSON</button>
-        <label for="importConfig" class="mt-4 w-full bg-purple-500 text-white p-2 rounded-md hover:bg-purple-600 focus:outline-none focus:ring-2 focus:ring-purple-500 inline-flex items-center justify-center cursor-pointer">
-            Import Config from JSON
-            <input type="file" id="importConfig" accept=".json" class="hidden" onchange="importConfig(this.files[0])" />
-        </label>
-        <button onclick="generateScript()" class="mt-4 w-full bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500">Download PowerShell Script</button>
-        <button onclick="generateIntuneScript()" class="mt-4 w-full bg-indigo-500 text-white p-2 rounded-md hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500">Download Intune Script</button>
-    </div>
-
-    <script>
-        let mappingCount = 1;
-
-        function addMapping(data = {}) {
-            const mappingsDiv = document.getElementById('mappings');
-            if (!mappingsDiv) {
-                alert('Error: Mappings container not found.');
-                return;
-            }
-            const newMapping = document.createElement('div');
-            newMapping.className = 'mapping border p-4 rounded-md mt-4';
-            newMapping.innerHTML = `
-                <div class="mb-4">
-                    <label for="driveLetter_${mappingCount}" class="block text-sm font-medium text-gray-700">Drive Letter</label>
-                    <input type="text" id="driveLetter_${mappingCount}" placeholder="e.g., G" value="${data.driveLetter || ''}" class="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div class="mb-4">
-                    <label for="networkPath_${mappingCount}" class="block text-sm font-medium text-gray-700">Network Path</label>
-                    <input type="text" id="networkPath_${mappingCount}" placeholder="e.g., \\srvdc01.company.local\company\share" value="${data.networkPath || ''}" class="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div class="mb-4">
-                    <label for="groupName_${mappingCount}" class="block text-sm font-medium text-gray-700">Group Name (Optional)</label>
-                    <input type="text" id="groupName_${mappingCount}" placeholder="e.g., Domain Users" value="${data.groupName || ''}" class="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div class="mb-4">
-                    <label for="profileName_${mappingCount}" class="block text-sm font-medium text-gray-700">Network Profile</label>
-                    <select id="profileName_${mappingCount}" class="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="DomainAuthenticated" ${data.profileName === 'DomainAuthenticated' ? 'selected' : ''}>DomainAuthenticated</option>
-                        <option value="Public" ${data.profileName === 'Public' ? 'selected' : ''}>Public</option>
-                        <option value="Private" ${data.profileName === 'Private' ? 'selected' : ''}>Private</option>
-                    </select>
-                </div>
-                <div class="mb-4">
-                    <label for="domainSuffix_${mappingCount}" class="block text-sm font-medium text-gray-700">Domain Suffix (Optional)</label>
-                    <input type="text" id="domainSuffix_${mappingCount}" placeholder="e.g., company.local" value="${data.domainSuffix || ''}" class="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <button onclick="removeMapping(this)" class="text-red-500 hover:text-red-700 text-sm">Remove Mapping</button>
-            `;
-            mappingsDiv.appendChild(newMapping);
-            mappingCount++;
-        }
-
-        function removeMapping(button) {
-            if (document.querySelectorAll('.mapping').length > 1) {
-                button.parentElement.remove();
-            } else {
-                alert('At least one mapping is required.');
-            }
-        }
-
-        function exportConfig() {
-            try {
-                const removeAllDrives = document.getElementById('removeAllDrives')?.checked || false;
-                const mappings = [];
-                for (let i = 0; i < mappingCount; i++) {
-                    const driveLetter = document.getElementById(`driveLetter_${i}`)?.value.trim();
-                    const networkPath = document.getElementById(`networkPath_${i}`)?.value.trim();
-                    const groupName = document.getElementById(`groupName_${i}`)?.value.trim();
-                    const profileName = document.getElementById(`profileName_${i}`)?.value;
-                    const domainSuffix = document.getElementById(`domainSuffix_${i}`)?.value.trim();
-
-                    if (driveLetter || networkPath || groupName || profileName || domainSuffix) {
-                        mappings.push({ driveLetter, networkPath, groupName, profileName, domainSuffix });
-                    }
-                }
-
-                const config = { removeAllDrives, mappings };
-                const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'drive_mapping_config.json';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            } catch (err) {
-                alert('Error exporting config: ' + err.message);
-            }
-        }
-
-        function importConfig(file) {
-            if (!file) {
-                alert('No file selected.');
-                return;
-            }
-            const reader = new FileReader();
-            reader.onload = function (e) {
-                try {
-                    const config = JSON.parse(e.target.result);
-                    if (!config || typeof config !== 'object') {
-                        alert('Invalid JSON file.');
-                        return;
-                    }
-
-                    const removeAllDrivesInput = document.getElementById('removeAllDrives');
-                    if (removeAllDrivesInput) {
-                        removeAllDrivesInput.checked = !!config.removeAllDrives;
-                    }
-
-                    const mappingsDiv = document.getElementById('mappings');
-                    if (!mappingsDiv) {
-                        alert('Error: Mappings container not found.');
-                        return;
-                    }
-                    mappingsDiv.innerHTML = '';
-                    mappingCount = 0;
-
-                    (config.mappings || []).forEach(mapping => {
-                        if (mapping.driveLetter || mapping.networkPath || mapping.groupName || mapping.profileName || mapping.domainSuffix) {
-                            addMapping({
-                                driveLetter: mapping.driveLetter || '',
-                                networkPath: mapping.networkPath || '',
-                                groupName: mapping.groupName || '',
-                                profileName: mapping.profileName || 'DomainAuthenticated',
-                                domainSuffix: mapping.domainSuffix || ''
-                            });
-                        }
-                    });
-
-                    if (mappingCount === 0) {
-                        addMapping();
-                    }
-                } catch (err) {
-                    alert('Error parsing JSON file: ' + err.message);
-                }
-            };
-            reader.onerror = function () {
-                alert('Error reading file.');
-            };
-            reader.readAsText(file);
-        }
-
-        function getDriveMappingScriptContent(mappings, removeAllDrives) {
-            return `# Remove all existing drive mappings if specified
-${removeAllDrives ? `
-Get-PSDrive -PSProvider FileSystem | Where-Object { $_.DisplayRoot -like '\\\\*' } | ForEach-Object {
+# Initialize event log source
+$EventSource = "DriveMapper"
+if (-not [System.Diagnostics.EventLog]::SourceExists($EventSource)) {
     try {
-        Remove-PSDrive -Name $_.Name -Force -ErrorAction Stop
-        Write-Host "Removed existing drive mapping: $($_.Name)"
-    }
-    catch {
-        Write-Host "Failed to remove drive $($_.Name): $_"
+        New-EventLog -LogName Application -Source $EventSource -ErrorAction Stop
+    } catch {
+        Write-Host "Failed to create event source: $_"
     }
 }
-` : ''}# Define mappings
-$mappings = @(
-${mappings.map((mapping, index) => `    @{ DriveLetter = "${mapping.driveLetter}"; NetworkPath = "${mapping.networkPath}"; GroupName = "${mapping.groupName || 'Domain Users'}"; ProfileName = "${mapping.profileName}"; DomainSuffix = "${mapping.domainSuffix || ''}" }${index < mappings.length - 1 ? ',' : ''}`).join('\n')}
-)
+Write-EventLog -LogName Application -Source $EventSource -EntryType Information -EventId 1000 -Message "Intune drive mapping script started."
 
-foreach ($mapping in $mappings) {
-    # Validate network path accessibility
-    if (-not (Test-Path $mapping.NetworkPath)) {
-        Write-Host "Network path $($mapping.NetworkPath) is inaccessible. Drive $($mapping.DriveLetter): not mapped."
-        continue
-    }
-
-    # Check if the network profile matches the specified profile
-    $networkProfiles = (Get-NetConnectionProfile).NetworkCategory
-    if ($networkProfiles -contains $mapping.ProfileName) {
-        # Check domain suffix if specified
-        $domainMatch = if ($mapping.DomainSuffix) {
-            $adapters = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' }
-            $matchFound = $false
-            foreach ($adapter in $adapters) {
-                $dnsConfig = Get-DnsClient | Where-Object { $_.InterfaceIndex -eq $adapter.InterfaceIndex }
-                if ($dnsConfig -and $dnsConfig.ConnectionSpecificSuffix -eq $mapping.DomainSuffix) {
-                    $matchFound = $true
-                    break
-                }
-            }
-            $matchFound
-        } else {
-            $true
-        }
-
-        if ($domainMatch) {
-            # Get the current user's domain and SID
-            $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent()
-            $userName = $currentUser.Name
-            $domain = $userName.Split('\\')[0]
-            $userSid = $currentUser.User.Value
-
-            # Check if the user is a member of the specified group using WMI
-            $group = $mapping.GroupName
-            $isMember = $false
-            try {
-                # Query the group (local or domain) using Win32_Group
-                $groupObj = Get-WmiObject -Class Win32_Group -Filter "Name='$group' AND (Domain='$domain' OR Domain='$env:COMPUTERNAME')"
-                if ($groupObj) {
-                    # Query Win32_GroupUser to check if the user is a member
-                    $groupSid = $groupObj.SID
-                    $membership = Get-WmiObject -Class Win32_GroupUser -Filter "GroupComponent=\\"Win32_Group.SID='$groupSid'\\""
-                    foreach ($member in $membership) {
-                        if ($member.PartComponent -match "Win32_UserAccount.SID='$userSid'") {
-                            $isMember = $true
-                            break
-                        }
-                    }
-                }
-            }
-            catch {
-                Write-Host "Error checking group membership for '$group': $_"
-            }
-
-            if ($isMember) {
-                # Check for existing drive mapping and unmap if necessary
-                if (Get-PSDrive -Name $mapping.DriveLetter -ErrorAction SilentlyContinue) {
-                    try {
-                        Remove-PSDrive -Name $mapping.DriveLetter -Force -ErrorAction Stop
-                        Write-Host "Removed conflicting drive mapping: $($mapping.DriveLetter)"
-                    }
-                    catch {
-                        Write-Host "Failed to remove conflicting drive $($mapping.DriveLetter): $_"
-                        continue
-                    }
-                }
-
-                # Map the drive to the specified network share
-                try {
-                    New-PSDrive -Name $mapping.DriveLetter -PSProvider FileSystem -Root $mapping.NetworkPath -Persist -ErrorAction Stop
-                    Write-Host "Drive $($mapping.DriveLetter): mapped successfully to $($mapping.NetworkPath)"
-                }
-                catch {
-                    Write-Host "Failed to map drive $($mapping.DriveLetter):. Error: $_"
-                }
-            }
-            else {
-                Write-Host "User is not a member of '$group'. Drive $($mapping.DriveLetter): not mapped."
-            }
-        }
-        else {
-            Write-Host "Domain suffix does not match '$($mapping.DomainSuffix)'. Drive $($mapping.DriveLetter): not mapped."
-        }
-    }
-    else {
-        Write-Host "Network profile is not $($mapping.ProfileName). Drive $($mapping.DriveLetter): not mapped."
-    }
-}
-`;
-        }
-
-        function generateScript() {
-            try {
-                const removeAllDrives = document.getElementById('removeAllDrives')?.checked || false;
-                const mappings = [];
-                const usedDriveLetters = new Set();
-                const reservedDriveLetters = ['A', 'B', 'C'];
-
-                for (let i = 0; i < mappingCount; i++) {
-                    const driveLetterInput = document.getElementById(`driveLetter_${i}`);
-                    const networkPathInput = document.getElementById(`networkPath_${i}`);
-                    const groupNameInput = document.getElementById(`groupName_${i}`);
-                    const profileNameInput = document.getElementById(`profileName_${i}`);
-                    const domainSuffixInput = document.getElementById(`domainSuffix_${i}`);
-
-                    if (!driveLetterInput || !networkPathInput || !profileNameInput) continue;
-
-                    const driveLetter = driveLetterInput.value.trim().toUpperCase();
-                    const networkPath = networkPathInput.value.trim();
-                    const groupName = groupNameInput.value.trim();
-                    const profileName = profileNameInput.value;
-                    const domainSuffix = domainSuffixInput.value.trim();
-
-                    if (!driveLetter || !networkPath) continue;
-
-                    // Validate inputs
-                    if (!driveLetter.match(/^[A-Z]$/)) {
-                        alert(`Invalid drive letter for mapping ${i + 1}. Please enter a single letter (e.g., G).`);
-                        return;
-                    }
-                    if (reservedDriveLetters.includes(driveLetter)) {
-                        alert(`Drive letter ${driveLetter} is reserved (A, B, C). Please choose another letter for mapping ${i + 1}.`);
-                        return;
-                    }
-                    if (usedDriveLetters.has(driveLetter)) {
-                        alert(`Duplicate drive letter ${driveLetter} in mapping ${i + 1}. Each mapping must use a unique drive letter.`);
-                        return;
-                    }
-                    usedDriveLetters.add(driveLetter);
-
-                    if (!networkPath.match(/^\\\\[a-zA-Z0-9.-]+\\[^\\]+(\\[^\\]+)*$/)) {
-                        alert(`Invalid network path for mapping ${i + 1}. Please enter a valid path (e.g., \\srvdc01.company.local\\company\\share).`);
-                        return;
-                    }
-                    if (groupName && !groupName.match(/^[a-zA-Z0-9\s_-]+$/)) {
-                        alert(`Invalid group name for mapping ${i + 1}. Use letters, numbers, spaces, underscores, or hyphens only.`);
-                        return;
-                    }
-                    if (!['DomainAuthenticated', 'Public', 'Private'].includes(profileName)) {
-                        alert(`Invalid profile name for mapping ${i + 1}. Please select a valid profile.`);
-                        return;
-                    }
-                    if (domainSuffix && !domainSuffix.match(/^[a-zA-Z0-9.-]+$/)) {
-                        alert(`Invalid domain suffix for mapping ${i + 1}. Use letters, numbers, dots, or hyphens only (e.g., company.local).`);
-                        return;
-                    }
-
-                    mappings.push({ driveLetter, networkPath, groupName, profileName, domainSuffix });
-                }
-
-                if (mappings.length === 0) {
-                    alert('Please provide at least one valid mapping.');
-                    return;
-                }
-
-                const scriptContent = getDriveMappingScriptContent(mappings, removeAllDrives);
-
-                const blob = new Blob([scriptContent], { type: 'text/plain' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'MapDrives.ps1';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            } catch (err) {
-                alert('Error generating PowerShell script: ' + err.message);
-            }
-        }
-
-        function generateIntuneScript() {
-            try {
-                const removeAllDrives = document.getElementById('removeAllDrives')?.checked || false;
-                const mappings = [];
-                const usedDriveLetters = new Set();
-                const reservedDriveLetters = ['A', 'B', 'C'];
-
-                for (let i = 0; i < mappingCount; i++) {
-                    const driveLetterInput = document.getElementById(`driveLetter_${i}`);
-                    const networkPathInput = document.getElementById(`networkPath_${i}`);
-                    const groupNameInput = document.getElementById(`groupName_${i}`);
-                    const profileNameInput = document.getElementById(`profileName_${i}`);
-                    const domainSuffixInput = document.getElementById(`domainSuffix_${i}`);
-
-                    if (!driveLetterInput || !networkPathInput || !profileNameInput) continue;
-
-                    const driveLetter = driveLetterInput.value.trim().toUpperCase();
-                    const networkPath = networkPathInput.value.trim();
-                    const groupName = groupNameInput.value.trim();
-                    const profileName = profileNameInput.value;
-                    const domainSuffix = domainSuffixInput.value.trim();
-
-                    if (!driveLetter || !networkPath) continue;
-
-                    if (!driveLetter.match(/^[A-Z]$/)) {
-                        alert(`Invalid drive letter for mapping ${i + 1}. Please enter a single letter (e.g., G).`);
-                        return;
-                    }
-                    if (reservedDriveLetters.includes(driveLetter)) {
-                        alert(`Drive letter ${driveLetter} is reserved (A, B, C). Please choose another letter for mapping ${i + 1}.`);
-                        return;
-                    }
-                    if (usedDriveLetters.has(driveLetter)) {
-                        alert(`Duplicate drive letter ${driveLetter} in mapping ${i + 1}. Each mapping must use a unique drive letter.`);
-                        return;
-                    }
-                    usedDriveLetters.add(driveLetter);
-
-                    if (!networkPath.match(/^\\\\[a-zA-Z0-9.-]+\\[^\\]+(\\[^\\]+)*$/)) {
-                        alert(`Invalid network path for mapping ${i + 1}. Please enter a valid path (e.g., \\srvdc01.company.local\\company\\share).`);
-                        return;
-                    }
-                    if (groupName && !groupName.match(/^[a-zA-Z0-9\s_-]+$/)) {
-                        alert(`Invalid group name for mapping ${i + 1}. Use letters, numbers, spaces, underscores, or hyphens only.`);
-                        return;
-                    }
-                    if (!['DomainAuthenticated', 'Public', 'Private'].includes(profileName)) {
-                        alert(`Invalid profile name for mapping ${i + 1}. Please select a valid profile.`);
-                        return;
-                    }
-                    if (domainSuffix && !domainSuffix.match(/^[a-zA-Z0-9.-]+$/)) {
-                        alert(`Invalid domain suffix for mapping ${i + 1}. Use letters, numbers, dots, or hyphens only (e.g., company.local).`);
-                        return;
-                    }
-
-                    mappings.push({ driveLetter, networkPath, groupName, profileName, domainSuffix });
-                }
-
-                if (mappings.length === 0) {
-                    alert('Please provide at least one valid mapping.');
-                    return;
-                }
-
-                const driveMappingScript = getDriveMappingScriptContent(mappings, removeAllDrives);
-                const base64Script = btoa(driveMappingScript);
-
-                const intuneScriptContent = `
 # Check if running in SYSTEM context
 $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-if ($currentUser -eq "NT AUTHORITY\\SYSTEM") {
+if ($currentUser -eq "NT AUTHORITY\SYSTEM") {
     try {
         # Create the DriveMapper directory if it doesn't exist
-        $scriptDir = "C:\\ProgramData\\DriveMapper"
+        $scriptDir = "C:\ProgramData\DriveMapper"
         if (-not (Test-Path $scriptDir)) {
             New-Item -Path $scriptDir -ItemType Directory -Force | Out-Null
             # Set permissions to SYSTEM and Administrators only
             $acl = Get-Acl $scriptDir
             $acl.SetAccessRuleProtection($true, $false)
-            $rule = New-Object System.Security.AccessControl.FileSystemAccessRule("NT AUTHORITY\\SYSTEM", "FullControl", "ContainerInherit, ObjectInherit", "None", "Allow")
+            $rule = New-Object System.Security.AccessControl.FileSystemAccessRule("NT AUTHORITY\SYSTEM", "FullControl", "ContainerInherit, ObjectInherit", "None", "Allow")
             $acl.AddAccessRule($rule)
             $rule = New-Object System.Security.AccessControl.FileSystemAccessRule("Administrators", "FullControl", "ContainerInherit, ObjectInherit", "None", "Allow")
             $acl.AddAccessRule($rule)
             Set-Acl $scriptDir $acl
+            Write-EventLog -LogName Application -Source $EventSource -EntryType Information -EventId 1001 -Message "Created DriveMapper directory at $scriptDir"
+        } else {
+            Write-EventLog -LogName Application -Source $EventSource -EntryType Information -EventId 1002 -Message "DriveMapper directory already exists at $scriptDir"
         }
 
-        # Save the Base64-encoded drive mapping script to C:\\ProgramData\\DriveMapper\\DriveMap.ps1
-        $base64Script = "${base64Script}"
+        # Save the Base64-encoded drive mapping script to C:\ProgramData\DriveMapper\DriveMap.ps1
+        $base64Script = "CiMgRGVmaW5lIGV2ZW50IGxvZyBzb3VyY2UKJEV2ZW50U291cmNlID0gIkRyaXZlTWFwcGVyIgpXcml0ZS1FdmVudExvZyAtTG9nTmFtZSBBcHBsaWNhdGlvbiAtU291cmNlICRFdmVudFNvdXJjZSAtRW50cnlUeXBlIEluZm9ybWF0aW9uIC1FdmVudElkIDIwMDAgLU1lc3NhZ2UgIkRyaXZlIG1hcHBpbmcgc2NyaXB0IHN0YXJ0ZWQuIgoKIyBSZW1vdmUgYWxsIGV4aXN0aW5nIGRyaXZlIG1hcHBpbmdzIGlmIHNwZWNpZmllZAoKdHJ5IHsKICAgIEdldC1QU0RyaXZlIC1QU1Byb3ZpZGVyIEZpbGVTeXN0ZW0gfCBXaGVyZS1PYmplY3QgeyAkXy5EaXNwbGF5Um9vdCAtbGlrZSAnXFwqJyB9IHwgRm9yRWFjaC1PYmplY3QgewogICAgICAgIHRyeSB7CiAgICAgICAgICAgIFJlbW92ZS1QU0RyaXZlIC1OYW1lICRfLk5hbWUgLUZvcmNlIC1FcnJvckFjdGlvbiBTdG9wCiAgICAgICAgICAgIFdyaXRlLUV2ZW50TG9nIC1Mb2dOYW1lIEFwcGxpY2F0aW9uIC1Tb3VyY2UgJEV2ZW50U291cmNlIC1FbnRyeVR5cGUgSW5mb3JtYXRpb24gLUV2ZW50SWQgMjAwMSAtTWVzc2FnZSAiUmVtb3ZlZCBleGlzdGluZyBkcml2ZSBtYXBwaW5nOiAkKCRfLk5hbWUpIgogICAgICAgICAgICBXcml0ZS1Ib3N0ICJSZW1vdmVkIGV4aXN0aW5nIGRyaXZlIG1hcHBpbmc6ICQoJF8uTmFtZSkiCiAgICAgICAgfQogICAgICAgIGNhdGNoIHsKICAgICAgICAgICAgV3JpdGUtRXZlbnRMb2cgLUxvZ05hbWUgQXBwbGljYXRpb24gLVNvdXJjZSAkRXZlbnRTb3VyY2UgLUVudHJ5VHlwZSBFcnJvciAtRXZlbnRJZCAyMDAyIC1NZXNzYWdlICJGYWlsZWQgdG8gcmVtb3ZlIGRyaXZlICQoJF8uTmFtZSk6ICRfIgogICAgICAgICAgICBXcml0ZS1Ib3N0ICJGYWlsZWQgdG8gcmVtb3ZlIGRyaXZlICQoJF8uTmFtZSk6ICRfIgogICAgICAgIH0KICAgIH0KfQpjYXRjaCB7CiAgICBXcml0ZS1FdmVudExvZyAtTG9nTmFtZSBBcHBsaWNhdGlvbiAtU291cmNlICRFdmVudFNvdXJjZSAtRW50cnlUeXBlIEVycm9yIC1FdmVudElkIDIwMDMgLU1lc3NhZ2UgIkVycm9yIHJlbW92aW5nIGV4aXN0aW5nIGRyaXZlIG1hcHBpbmdzOiAkXyIKICAgIFdyaXRlLUhvc3QgIkVycm9yIHJlbW92aW5nIGV4aXN0aW5nIGRyaXZlIG1hcHBpbmdzOiAkXyIKfQojIERlZmluZSBtYXBwaW5ncwokbWFwcGluZ3MgPSBAKAogICAgQHsgRHJpdmVMZXR0ZXIgPSAiRyI7IE5ldHdvcmtQYXRoID0gIlxcMTkyLjE2OC4xMDEuMjUwXGdzcG90IjsgR3JvdXBOYW1lID0gIkRvbWFpbiBVc2VycyI7IFByb2ZpbGVOYW1lID0gIkRvbWFpbkF1dGhlbnRpY2F0ZWQiOyBEb21haW5TdWZmaXggPSAiIiB9CikKCmZvcmVhY2ggKCRtYXBwaW5nIGluICRtYXBwaW5ncykgewogICAgV3JpdGUtRXZlbnRMb2cgLUxvZ05hbWUgQXBwbGljYXRpb24gLVNvdXJjZSAkRXZlbnRTb3VyY2UgLUVudHJ5VHlwZSBJbmZvcm1hdGlvbiAtRXZlbnRJZCAyMDA0IC1NZXNzYWdlICJQcm9jZXNzaW5nIGRyaXZlIG1hcHBpbmcgZm9yICQoJG1hcHBpbmcuRHJpdmVMZXR0ZXIpOiB0byAkKCRtYXBwaW5nLk5ldHdvcmtQYXRoKSIKCiAgICAjIFZhbGlkYXRlIG5ldHdvcmsgcGF0aCBhY2Nlc3NpYmlsaXR5CiAgICBpZiAoLW5vdCAoVGVzdC1QYXRoICRtYXBwaW5nLk5ldHdvcmtQYXRoKSkgewogICAgICAgIFdyaXRlLUV2ZW50TG9nIC1Mb2dOYW1lIEFwcGxpY2F0aW9uIC1Tb3VyY2UgJEV2ZW50U291cmNlIC1FbnRyeVR5cGUgV2FybmluZyAtRXZlbnRJZCAyMDA1IC1NZXNzYWdlICJOZXR3b3JrIHBhdGggJCgkbWFwcGluZy5OZXR3b3JrUGF0aCkgaXMgaW5hY2Nlc3NpYmxlLiBEcml2ZSAkKCRtYXBwaW5nLkRyaXZlTGV0dGVyKTogbm90IG1hcHBlZC4iCiAgICAgICAgV3JpdGUtSG9zdCAiTmV0d29yayBwYXRoICQoJG1hcHBpbmcuTmV0d29ya1BhdGgpIGlzIGluYWNjZXNzaWJsZS4gRHJpdmUgJCgkbWFwcGluZy5Ecml2ZUxldHRlcik6IG5vdCBtYXBwZWQuIgogICAgICAgIGNvbnRpbnVlCiAgICB9CgogICAgIyBDaGVjayBpZiB0aGUgbmV0d29yayBwcm9maWxlIG1hdGNoZXMgdGhlIHNwZWNpZmllZCBwcm9maWxlCiAgICAkbmV0d29ya1Byb2ZpbGVzID0gKEdldC1OZXRDb25uZWN0aW9uUHJvZmlsZSkuTmV0d29ya0NhdGVnb3J5CiAgICBpZiAoJG5ldHdvcmtQcm9maWxlcyAtY29udGFpbnMgJG1hcHBpbmcuUHJvZmlsZU5hbWUpIHsKICAgICAgICAjIENoZWNrIGRvbWFpbiBzdWZmaXggaWYgc3BlY2lmaWVkCiAgICAgICAgJGRvbWFpbk1hdGNoID0gaWYgKCRtYXBwaW5nLkRvbWFpblN1ZmZpeCkgewogICAgICAgICAgICAkYWRhcHRlcnMgPSBHZXQtTmV0QWRhcHRlciB8IFdoZXJlLU9iamVjdCB7ICRfLlN0YXR1cyAtZXEgJ1VwJyB9CiAgICAgICAgICAgICRtYXRjaEZvdW5kID0gJGZhbHNlCiAgICAgICAgICAgIGZvcmVhY2ggKCRhZGFwdGVyIGluICRhZGFwdGVycykgewogICAgICAgICAgICAgICAgJGRuc0NvbmZpZyA9IEdldC1EbnNDbGllbnQgfCBXaGVyZS1PYmplY3QgeyAkXy5JbnRlcmZhY2VJbmRleCAtZXEgJGFkYXB0ZXIuSW50ZXJmYWNlSW5kZXggfQogICAgICAgICAgICAgICAgaWYgKCRkbnNDb25maWcgLWFuZCAkZG5zQ29uZmlnLkNvbm5lY3Rpb25TcGVjaWZpY1N1ZmZpeCAtZXEgJG1hcHBpbmcuRG9tYWluU3VmZml4KSB7CiAgICAgICAgICAgICAgICAgICAgJG1hdGNoRm91bmQgPSAkdHJ1ZQogICAgICAgICAgICAgICAgICAgIGJyZWFrCiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgIH0KICAgICAgICAgICAgJG1hdGNoRm91bmQKICAgICAgICB9IGVsc2UgewogICAgICAgICAgICAkdHJ1ZQogICAgICAgIH0KCiAgICAgICAgaWYgKCRkb21haW5NYXRjaCkgewogICAgICAgICAgICAjIEdldCB0aGUgY3VycmVudCB1c2VyJ3MgZG9tYWluIGFuZCBTSUQKICAgICAgICAgICAgJGN1cnJlbnRVc2VyID0gW1N5c3RlbS5TZWN1cml0eS5QcmluY2lwYWwuV2luZG93c0lkZW50aXR5XTo6R2V0Q3VycmVudCgpCiAgICAgICAgICAgICR1c2VyTmFtZSA9ICRjdXJyZW50VXNlci5OYW1lCiAgICAgICAgICAgICRkb21haW4gPSAkdXNlck5hbWUuU3BsaXQoJ1wnKVswXQogICAgICAgICAgICAkdXNlclNpZCA9ICRjdXJyZW50VXNlci5Vc2VyLlZhbHVlCgogICAgICAgICAgICAjIENoZWNrIGlmIHRoZSBtYWNoaW5lIGlzIGRvbWFpbi1qb2luZWQKICAgICAgICAgICAgJGlzRG9tYWluSm9pbmVkID0gKEdldC1XbWlPYmplY3QgLUNsYXNzIFdpbjMyX0NvbXB1dGVyU3lzdGVtKS5QYXJ0T2ZEb21haW4KCiAgICAgICAgICAgICMgQ2hlY2sgaWYgdGhlIHVzZXIgaXMgYSBtZW1iZXIgb2YgdGhlIHNwZWNpZmllZCBncm91cAogICAgICAgICAgICAkZ3JvdXAgPSAkbWFwcGluZy5Hcm91cE5hbWUKICAgICAgICAgICAgJGlzTWVtYmVyID0gJGZhbHNlCiAgICAgICAgICAgIHRyeSB7CiAgICAgICAgICAgICAgICAjIElmIG5vdCBkb21haW4tam9pbmVkIGFuZCBncm91cCBpcyBhIGRvbWFpbiBncm91cCwgc2tpcCBtZW1iZXJzaGlwIGNoZWNrCiAgICAgICAgICAgICAgICBpZiAoLW5vdCAkaXNEb21haW5Kb2luZWQgLWFuZCAkZ3JvdXAgLWVxICdEb21haW4gVXNlcnMnKSB7CiAgICAgICAgICAgICAgICAgICAgV3JpdGUtRXZlbnRMb2cgLUxvZ05hbWUgQXBwbGljYXRpb24gLVNvdXJjZSAkRXZlbnRTb3VyY2UgLUVudHJ5VHlwZSBXYXJuaW5nIC1FdmVudElkIDIwMDYgLU1lc3NhZ2UgIk1hY2hpbmUgaXMgbm90IGRvbWFpbi1qb2luZWQuIENhbm5vdCBiZSBhIG1lbWJlciBvZiAnJGdyb3VwJy4gRHJpdmUgJCgkbWFwcGluZy5Ecml2ZUxldHRlcik6IG5vdCBtYXBwZWQuIgogICAgICAgICAgICAgICAgICAgIFdyaXRlLUhvc3QgIk1hY2hpbmUgaXMgbm90IGRvbWFpbi1qb2luZWQuIENhbm5vdCBiZSBhIG1lbWJlciBvZiAnJGdyb3VwJy4gRHJpdmUgJCgkbWFwcGluZy5Ecml2ZUxldHRlcik6IG5vdCBtYXBwZWQuIgogICAgICAgICAgICAgICAgICAgIGNvbnRpbnVlCiAgICAgICAgICAgICAgICB9CgogICAgICAgICAgICAgICAgIyBRdWVyeSB0aGUgZ3JvdXAgKGxvY2FsIG9yIGRvbWFpbikgdXNpbmcgV2luMzJfR3JvdXAKICAgICAgICAgICAgICAgICRncm91cE9iaiA9IEdldC1XbWlPYmplY3QgLUNsYXNzIFdpbjMyX0dyb3VwIC1GaWx0ZXIgIk5hbWU9JyRncm91cCcgQU5EIChEb21haW49JyRkb21haW4nIE9SIERvbWFpbj0nJGVudjpDT01QVVRFUk5BTUUnKSIKICAgICAgICAgICAgICAgIGlmICgkZ3JvdXBPYmopIHsKICAgICAgICAgICAgICAgICAgICAjIFF1ZXJ5IFdpbjMyX0dyb3VwVXNlciB0byBjaGVjayBpZiB0aGUgdXNlciBpcyBhIG1lbWJlcgogICAgICAgICAgICAgICAgICAgICRncm91cFNpZCA9ICRncm91cE9iai5TSUQKICAgICAgICAgICAgICAgICAgICAkbWVtYmVyc2hpcCA9IEdldC1XbWlPYmplY3QgLUNsYXNzIFdpbjMyX0dyb3VwVXNlciAtRmlsdGVyICJHcm91cENvbXBvbmVudD1cIldpbjMyX0dyb3VwLlNJRD0nJGdyb3VwU2lkJ1wiIgogICAgICAgICAgICAgICAgICAgIGlmICgkbWVtYmVyc2hpcCkgewogICAgICAgICAgICAgICAgICAgICAgICBmb3JlYWNoICgkbWVtYmVyIGluICRtZW1iZXJzaGlwKSB7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICBpZiAoJG1lbWJlci5QYXJ0Q29tcG9uZW50IC1tYXRjaCAiV2luMzJfVXNlckFjY291bnQuU0lEPSckdXNlclNpZCciKSB7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgJGlzTWVtYmVyID0gJHRydWUKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBicmVhawogICAgICAgICAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgfSBlbHNlIHsKICAgICAgICAgICAgICAgICAgICBXcml0ZS1FdmVudExvZyAtTG9nTmFtZSBBcHBsaWNhdGlvbiAtU291cmNlICRFdmVudFNvdXJjZSAtRW50cnlUeXBlIFdhcm5pbmcgLUV2ZW50SWQgMjAwNiAtTWVzc2FnZSAiR3JvdXAgJyRncm91cCcgbm90IGZvdW5kLiBEcml2ZSAkKCRtYXBwaW5nLkRyaXZlTGV0dGVyKTogbm90IG1hcHBlZC4iCiAgICAgICAgICAgICAgICAgICAgV3JpdGUtSG9zdCAiR3JvdXAgJyRncm91cCcgbm90IGZvdW5kLiBEcml2ZSAkKCRtYXBwaW5nLkRyaXZlTGV0dGVyKTogbm90IG1hcHBlZC4iCiAgICAgICAgICAgICAgICAgICAgY29udGludWUKICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgIFdyaXRlLUV2ZW50TG9nIC1Mb2dOYW1lIEFwcGxpY2F0aW9uIC1Tb3VyY2UgJEV2ZW50U291cmNlIC1FbnRyeVR5cGUgSW5mb3JtYXRpb24gLUV2ZW50SWQgMjAwNiAtTWVzc2FnZSAiVXNlciBncm91cCBtZW1iZXJzaGlwIGNoZWNrIGZvciAnJGdyb3VwJzogJChpZiAoJGlzTWVtYmVyKSB7ICdNZW1iZXInIH0gZWxzZSB7ICdOb3QgYSBtZW1iZXInIH0pIgogICAgICAgICAgICB9CiAgICAgICAgICAgIGNhdGNoIHsKICAgICAgICAgICAgICAgIFdyaXRlLUV2ZW50TG9nIC1Mb2dOYW1lIEFwcGxpY2F0aW9uIC1Tb3VyY2UgJEV2ZW50U291cmNlIC1FbnRyeVR5cGUgRXJyb3IgLUV2ZW50SWQgMjAwNyAtTWVzc2FnZSAiRXJyb3IgY2hlY2tpbmcgZ3JvdXAgbWVtYmVyc2hpcCBmb3IgJyRncm91cCc6ICRfIgogICAgICAgICAgICAgICAgV3JpdGUtSG9zdCAiRXJyb3IgY2hlY2tpbmcgZ3JvdXAgbWVtYmVyc2hpcCBmb3IgJyRncm91cCc6ICRfIgogICAgICAgICAgICAgICAgY29udGludWUKICAgICAgICAgICAgfQoKICAgICAgICAgICAgaWYgKCRpc01lbWJlcikgewogICAgICAgICAgICAgICAgIyBDaGVjayBmb3IgZXhpc3RpbmcgZHJpdmUgbWFwcGluZyBhbmQgdW5tYXAgaWYgbmVjZXNzYXJ5CiAgICAgICAgICAgICAgICBpZiAoR2V0LVBTRHJpdmUgLU5hbWUgJG1hcHBpbmcuRHJpdmVMZXR0ZXIgLUVycm9yQWN0aW9uIFNpbGVudGx5Q29udGludWUpIHsKICAgICAgICAgICAgICAgICAgICB0cnkgewogICAgICAgICAgICAgICAgICAgICAgICBSZW1vdmUtUFNEcml2ZSAtTmFtZSAkbWFwcGluZy5Ecml2ZUxldHRlciAtRm9yY2UgLUVycm9yQWN0aW9uIFN0b3AKICAgICAgICAgICAgICAgICAgICAgICAgV3JpdGUtRXZlbnRMb2cgLUxvZ05hbWUgQXBwbGljYXRpb24gLVNvdXJjZSAkRXZlbnRTb3VyY2UgLUVudHJ5VHlwZSBJbmZvcm1hdGlvbiAtRXZlbnRJZCAyMDA4IC1NZXNzYWdlICJSZW1vdmVkIGNvbmZsaWN0aW5nIGRyaXZlIG1hcHBpbmc6ICQoJG1hcHBpbmcuRHJpdmVMZXR0ZXIpIgogICAgICAgICAgICAgICAgICAgICAgICBXcml0ZS1Ib3N0ICJSZW1vdmVkIGNvbmZsaWN0aW5nIGRyaXZlIG1hcHBpbmc6ICQoJG1hcHBpbmcuRHJpdmVMZXR0ZXIpIgogICAgICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgICAgICBjYXRjaCB7CiAgICAgICAgICAgICAgICAgICAgICAgIFdyaXRlLUV2ZW50TG9nIC1Mb2dOYW1lIEFwcGxpY2F0aW9uIC1Tb3VyY2UgJEV2ZW50U291cmNlIC1FbnRyeVR5cGUgRXJyb3IgLUV2ZW50SWQgMjAwOSAtTWVzc2FnZSAiRmFpbGVkIHRvIHJlbW92ZSBjb25mbGljdGluZyBkcml2ZSAkKCRtYXBwaW5nLkRyaXZlTGV0dGVyKTogJF8iCiAgICAgICAgICAgICAgICAgICAgICAgIFdyaXRlLUhvc3QgIkZhaWxlZCB0byByZW1vdmUgY29uZmxpY3RpbmcgZHJpdmUgJCgkbWFwcGluZy5Ecml2ZUxldHRlcik6ICRfIgogICAgICAgICAgICAgICAgICAgICAgICBjb250aW51ZQogICAgICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgIH0KCiAgICAgICAgICAgICAgICAjIE1hcCB0aGUgZHJpdmUgdG8gdGhlIHNwZWNpZmllZCBuZXR3b3JrIHNoYXJlCiAgICAgICAgICAgICAgICB0cnkgewogICAgICAgICAgICAgICAgICAgIE5ldy1QU0RyaXZlIC1OYW1lICRtYXBwaW5nLkRyaXZlTGV0dGVyIC1QU1Byb3ZpZGVyIEZpbGVTeXN0ZW0gLVJvb3QgJG1hcHBpbmcuTmV0d29ya1BhdGggLVBlcnNpc3QgLUVycm9yQWN0aW9uIFN0b3AKICAgICAgICAgICAgICAgICAgICBXcml0ZS1FdmVudExvZyAtTG9nTmFtZSBBcHBsaWNhdGlvbiAtU291cmNlICRFdmVudFNvdXJjZSAtRW50cnlUeXBlIEluZm9ybWF0aW9uIC1FdmVudElkIDIwMTAgLU1lc3NhZ2UgIkRyaXZlICQoJG1hcHBpbmcuRHJpdmVMZXR0ZXIpOiBtYXBwZWQgc3VjY2Vzc2Z1bGx5IHRvICQoJG1hcHBpbmcuTmV0d29ya1BhdGgpIgogICAgICAgICAgICAgICAgICAgIFdyaXRlLUhvc3QgIkRyaXZlICQoJG1hcHBpbmcuRHJpdmVMZXR0ZXIpOiBtYXBwZWQgc3VjY2Vzc2Z1bGx5IHRvICQoJG1hcHBpbmcuTmV0d29ya1BhdGgpIgogICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgY2F0Y2ggewogICAgICAgICAgICAgICAgICAgIFdyaXRlLUV2ZW50TG9nIC1Mb2dOYW1lIEFwcGxpY2F0aW9uIC1Tb3VyY2UgJEV2ZW50U291cmNlIC1FbnRyeVR5cGUgRXJyb3IgLUV2ZW50SWQgMjAxMSAtTWVzc2FnZSAiRmFpbGVkIHRvIG1hcCBkcml2ZSAkKCRtYXBwaW5nLkRyaXZlTGV0dGVyKTogJF8iCiAgICAgICAgICAgICAgICAgICAgV3JpdGUtSG9zdCAiRmFpbGVkIHRvIG1hcCBkcml2ZSAkKCRtYXBwaW5nLkRyaXZlTGV0dGVyKTouIEVycm9yOiAkXyIKICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgfQogICAgICAgICAgICBlbHNlIHsKICAgICAgICAgICAgICAgIFdyaXRlLUV2ZW50TG9nIC1Mb2dOYW1lIEFwcGxpY2F0aW9uIC1Tb3VyY2UgJEV2ZW50U291cmNlIC1FbnRyeVR5cGUgV2FybmluZyAtRXZlbnRJZCAyMDEyIC1NZXNzYWdlICJVc2VyIGlzIG5vdCBhIG1lbWJlciBvZiAnJGdyb3VwJy4gRHJpdmUgJCgkbWFwcGluZy5Ecml2ZUxldHRlcik6IG5vdCBtYXBwZWQuIgogICAgICAgICAgICAgICAgV3JpdGUtSG9zdCAiVXNlciBpcyBub3QgYSBtZW1iZXIgb2YgJyRncm91cCcuIERyaXZlICQoJG1hcHBpbmcuRHJpdmVMZXR0ZXIpOiBub3QgbWFwcGVkLiIKICAgICAgICAgICAgfQogICAgICAgIH0KICAgICAgICBlbHNlIHsKICAgICAgICAgICAgV3JpdGUtRXZlbnRMb2cgLUxvZ05hbWUgQXBwbGljYXRpb24gLVNvdXJjZSAkRXZlbnRTb3VyY2UgLUVudHJ5VHlwZSBXYXJuaW5nIC1FdmVudElkIDIwMTMgLU1lc3NhZ2UgIkRvbWFpbiBzdWZmaXggZG9lcyBub3QgbWF0Y2ggJyQoJG1hcHBpbmcuRG9tYWluU3VmZml4KScuIERyaXZlICQoJG1hcHBpbmcuRHJpdmVMZXR0ZXIpOiBub3QgbWFwcGVkLiIKICAgICAgICAgICAgV3JpdGUtSG9zdCAiRG9tYWluIHN1ZmZpeCBkb2VzIG5vdCBtYXRjaCAnJCgkbWFwcGluZy5Eb21haW5TdWZmaXgpJy4gRHJpdmUgJCgkbWFwcGluZy5Ecml2ZUxldHRlcik6IG5vdCBtYXBwZWQuIgogICAgICAgIH0KICAgIH0KICAgIGVsc2UgewogICAgICAgIFdyaXRlLUV2ZW50TG9nIC1Mb2dOYW1lIEFwcGxpY2F0aW9uIC1Tb3VyY2UgJEV2ZW50U291cmNlIC1FbnRyeVR5cGUgV2FybmluZyAtRXZlbnRJZCAyMDE0IC1NZXNzYWdlICJOZXR3b3JrIHByb2ZpbGUgaXMgbm90ICQoJG1hcHBpbmcuUHJvZmlsZU5hbWUpLiBEcml2ZSAkKCRtYXBwaW5nLkRyaXZlTGV0dGVyKTogbm90IG1hcHBlZC4iCiAgICAgICAgV3JpdGUtSG9zdCAiTmV0d29yayBwcm9maWxlIGlzIG5vdCAkKCRtYXBwaW5nLlByb2ZpbGVOYW1lKS4gRHJpdmUgJCgkbWFwcGluZy5Ecml2ZUxldHRlcik6IG5vdCBtYXBwZWQuIgogICAgfQp9CldyaXRlLUV2ZW50TG9nIC1Mb2dOYW1lIEFwcGxpY2F0aW9uIC1Tb3VyY2UgJEV2ZW50U291cmNlIC1FbnRyeVR5cGUgSW5mb3JtYXRpb24gLUV2ZW50SWQgMjAxNSAtTWVzc2FnZSAiRHJpdmUgbWFwcGluZyBzY3JpcHQgY29tcGxldGVkLiIK"
         $scriptBytes = [System.Convert]::FromBase64String($base64Script)
         $scriptContent = [System.Text.Encoding]::UTF8.GetString($scriptBytes)
-        $scriptPath = "$scriptDir\\DriveMap.ps1"
+        $scriptPath = "$scriptDir\DriveMap.ps1"
         [System.IO.File]::WriteAllText($scriptPath, $scriptContent)
-        # Set file permissions to SYSTEM and Administrators only
+        # Set file permissions to SYSTEM, Administrators, and Users
         $acl = Get-Acl $scriptPath
         $acl.SetAccessRuleProtection($true, $false)
-        $rule = New-Object System.Security.AccessControl.FileSystemAccessRule("NT AUTHORITY\\SYSTEM", "FullControl", "Allow")
+        $rule = New-Object System.Security.AccessControl.FileSystemAccessRule("NT AUTHORITY\SYSTEM", "FullControl", "Allow")
         $acl.AddAccessRule($rule)
         $rule = New-Object System.Security.AccessControl.FileSystemAccessRule("Administrators", "FullControl", "Allow")
         $acl.AddAccessRule($rule)
+        $rule = New-Object System.Security.AccessControl.FileSystemAccessRule("Users", "ReadAndExecute", "Allow")
+        $acl.AddAccessRule($rule)
         Set-Acl $scriptPath $acl
-        Write-Host "Drive mapping script saved to $scriptPath"
+        Write-EventLog -LogName Application -Source $EventSource -EntryType Information -EventId 1003 -Message "Drive mapping script saved to $scriptPath"
+        Write-EventLog -LogName Application -Source $EventSource -EntryType Information -EventId 1008 -Message "Granted ReadAndExecute permissions to Users for $scriptPath"
 
         # Create a scheduled task to run the drive mapping script at user logon
         $taskName = "DriveMappingTask"
         $taskDescription = "Runs drive mapping script at user logon"
-        $action = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File \\"$scriptPath\\""
+        $action = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File 'C:\ProgramData\DriveMapper\DriveMap.ps1'"
         $trigger = New-ScheduledTaskTrigger -AtLogOn
         $principal = New-ScheduledTaskPrincipal -GroupId "Users" -RunLevel Limited
         $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
 
         # Register the scheduled task
         Register-ScheduledTask -TaskName $taskName -Description $taskDescription -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force
+        Write-EventLog -LogName Application -Source $EventSource -EntryType Information -EventId 1004 -Message "Scheduled task '$taskName' created successfully"
         Write-Host "Scheduled task '$taskName' created successfully"
     }
     catch {
+        Write-EventLog -LogName Application -Source $EventSource -EntryType Error -EventId 1005 -Message "Error setting up drive mapping task: $_"
         Write-Error "Error setting up drive mapping task: $_"
         exit 1
     }
 }
 else {
+    Write-EventLog -LogName Application -Source $EventSource -EntryType Error -EventId 1006 -Message "Script not running in SYSTEM context. Please deploy via Intune with SYSTEM context."
     Write-Host "Script not running in SYSTEM context. Please deploy via Intune with SYSTEM context."
 }
-`;
-
-                const blob = new Blob([intuneScriptContent], { type: 'text/plain' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'IntuneDriveMap.ps1';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            } catch (err) {
-                alert('Error generating Intune script: ' + err.message);
-            }
-        }
-    </script>
-    <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'93eceac0a8dc7bbd',t:'MTc0NzA4NDM3NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
-</body>
-</html>
+Write-EventLog -LogName Application -Source $EventSource -EntryType Information -EventId 1007 -Message "Intune drive mapping script completed."
