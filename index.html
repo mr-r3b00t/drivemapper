@@ -405,8 +405,8 @@ foreach ($mapping in $mappings) {
         Write-EventLog -LogName Application -Source $EventSource -EntryType Information -EventId 2016 -Message "SMB port 445 open on $hostname."
     }
     catch {
-        Write-EventLog -LogName Application -Source $EventSource -EntryType Error -EventId 2016 -Message "Error testing SMB port 445 on $hostname: $_"
-        Write-Host "Error testing SMB port 445 on $hostname: $_"
+        Write-EventLog -LogName Application -Source $EventSource -EntryType Error -EventId 2016 -Message "Error testing SMB port 445 on ${hostname}: $_"
+        Write-Host "Error testing SMB port 445 on ${hostname}: $_"
         continue
     }
 
