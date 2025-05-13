@@ -38,14 +38,18 @@
         return gk_fileData[filename] || "";
         }
         </script><script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
+    var gk_isXlsx = false;
+    var gk_xlsxFileLookup = {};
+    var gk_fileData = {};
+    function filledCell(cell) {
+        return cell !== '' && cell != null;
+    }
+    function loadFileData(filename) {
         if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            if (typeof XLSX === 'undefined') {
+                console.error('XLSX library is not loaded.');
+                return "";
+            }
             try {
                 var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
                 var firstSheetName = workbook.SheetNames[0];
@@ -58,24 +62,24 @@
 
                 // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
                 var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                    row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
                 );
                 // Fallback
                 if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
+                    headerRowIndex = 0;
                 }
 
                 // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex));
                 csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
                 return csv;
             } catch (e) {
-                console.error(e);
+                console.error('Error processing XLSX file:', e);
                 return "";
             }
         }
         return gk_fileData[filename] || "";
-        }
+    }
 </script>
 <!DOCTYPE html>
 <html lang="en">
@@ -138,6 +142,10 @@
 
         function addMapping(data = {}) {
             const mappingsDiv = document.getElementById('mappings');
+            if (!mappingsDiv) {
+                alert('Error: Mappings container not found.');
+                return;
+            }
             const newMapping = document.createElement('div');
             newMapping.className = 'mapping border p-4 rounded-md mt-4';
             newMapping.innerHTML = `
@@ -180,34 +188,41 @@
         }
 
         function exportConfig() {
-            const removeAllDrives = document.getElementById('removeAllDrives').checked;
-            const mappings = [];
-            for (let i = 0; i < mappingCount; i++) {
-                const driveLetter = document.getElementById(`driveLetter_${i}`)?.value.trim();
-                const networkPath = document.getElementById(`networkPath_${i}`)?.value.trim();
-                const groupName = document.getElementById(`groupName_${i}`)?.value.trim();
-                const profileName = document.getElementById(`profileName_${i}`)?.value;
-                const domainSuffix = document.getElementById(`domainSuffix_${i}`)?.value.trim();
+            try {
+                const removeAllDrives = document.getElementById('removeAllDrives')?.checked || false;
+                const mappings = [];
+                for (let i = 0; i < mappingCount; i++) {
+                    const driveLetter = document.getElementById(`driveLetter_${i}`)?.value.trim();
+                    const networkPath = document.getElementById(`networkPath_${i}`)?.value.trim();
+                    const groupName = document.getElementById(`groupName_${i}`)?.value.trim();
+                    const profileName = document.getElementById(`profileName_${i}`)?.value;
+                    const domainSuffix = document.getElementById(`domainSuffix_${i}`)?.value.trim();
 
-                if (driveLetter || networkPath || groupName || profileName || domainSuffix) {
-                    mappings.push({ driveLetter, networkPath, groupName, profileName, domainSuffix });
+                    if (driveLetter || networkPath || groupName || profileName || domainSuffix) {
+                        mappings.push({ driveLetter, networkPath, groupName, profileName, domainSuffix });
+                    }
                 }
-            }
 
-            const config = { removeAllDrives, mappings };
-            const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'drive_mapping_config.json';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+                const config = { removeAllDrives, mappings };
+                const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'drive_mapping_config.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (err) {
+                alert('Error exporting config: ' + err.message);
+            }
         }
 
         function importConfig(file) {
-            if (!file) return;
+            if (!file) {
+                alert('No file selected.');
+                return;
+            }
             const reader = new FileReader();
             reader.onload = function (e) {
                 try {
@@ -217,9 +232,16 @@
                         return;
                     }
 
-                    document.getElementById('removeAllDrives').checked = !!config.removeAllDrives;
+                    const removeAllDrivesInput = document.getElementById('removeAllDrives');
+                    if (removeAllDrivesInput) {
+                        removeAllDrivesInput.checked = !!config.removeAllDrives;
+                    }
 
                     const mappingsDiv = document.getElementById('mappings');
+                    if (!mappingsDiv) {
+                        alert('Error: Mappings container not found.');
+                        return;
+                    }
                     mappingsDiv.innerHTML = '';
                     mappingCount = 0;
 
@@ -241,6 +263,9 @@
                 } catch (err) {
                     alert('Error parsing JSON file: ' + err.message);
                 }
+            };
+            reader.onerror = function () {
+                alert('Error reading file.');
             };
             reader.readAsText(file);
         }
@@ -355,131 +380,152 @@ foreach ($mapping in $mappings) {
         }
 
         function generateScript() {
-            const removeAllDrives = document.getElementById('removeAllDrives').checked;
-            const mappings = [];
-            const usedDriveLetters = new Set();
-            const reservedDriveLetters = ['A', 'B', 'C'];
+            try {
+                const removeAllDrives = document.getElementById('removeAllDrives')?.checked || false;
+                const mappings = [];
+                const usedDriveLetters = new Set();
+                const reservedDriveLetters = ['A', 'B', 'C'];
 
-            for (let i = 0; i < mappingCount; i++) {
-                const driveLetter = document.getElementById(`driveLetter_${i}`)?.value.trim().toUpperCase();
-                const networkPath = document.getElementById(`networkPath_${i}`)?.value.trim();
-                const groupName = document.getElementById(`groupName_${i}`)?.value.trim();
-                const profileName = document.getElementById(`profileName_${i}`)?.value;
-                const domainSuffix = document.getElementById(`domainSuffix_${i}`)?.value.trim();
+                for (let i = 0; i < mappingCount; i++) {
+                    const driveLetterInput = document.getElementById(`driveLetter_${i}`);
+                    const networkPathInput = document.getElementById(`networkPath_${i}`);
+                    const groupNameInput = document.getElementById(`groupName_${i}`);
+                    const profileNameInput = document.getElementById(`profileName_${i}`);
+                    const domainSuffixInput = document.getElementById(`domainSuffix_${i}`);
 
-                if (!driveLetter || !networkPath) continue;
+                    if (!driveLetterInput || !networkPathInput || !profileNameInput) continue;
 
-                // Validate inputs
-                if (!driveLetter.match(/^[A-Z]$/)) {
-                    alert(`Invalid drive letter for mapping ${i + 1}. Please enter a single letter (e.g., G).`);
-                    return;
-                }
-                if (reservedDriveLetters.includes(driveLetter)) {
-                    alert(`Drive letter ${driveLetter} is reserved (A, B, C). Please choose another letter for mapping ${i + 1}.`);
-                    return;
-                }
-                if (usedDriveLetters.has(driveLetter)) {
-                    alert(`Duplicate drive letter ${driveLetter} in mapping ${i + 1}. Each mapping must use a unique drive letter.`);
-                    return;
-                }
-                usedDriveLetters.add(driveLetter);
+                    const driveLetter = driveLetterInput.value.trim().toUpperCase();
+                    const networkPath = networkPathInput.value.trim();
+                    const groupName = groupNameInput.value.trim();
+                    const profileName = profileNameInput.value;
+                    const domainSuffix = domainSuffixInput.value.trim();
 
-                if (!networkPath.match(/^\\\\[a-zA-Z0-9.-]+\\[^\\]+(\\[^\\]+)*$/)) {
-                    alert(`Invalid network path for mapping ${i + 1}. Please enter a valid path (e.g., \\srvdc01.company.local\\company\\share).`);
-                    return;
+                    if (!driveLetter || !networkPath) continue;
+
+                    // Validate inputs
+                    if (!driveLetter.match(/^[A-Z]$/)) {
+                        alert(`Invalid drive letter for mapping ${i + 1}. Please enter a single letter (e.g., G).`);
+                        return;
+                    }
+                    if (reservedDriveLetters.includes(driveLetter)) {
+                        alert(`Drive letter ${driveLetter} is reserved (A, B, C). Please choose another letter for mapping ${i + 1}.`);
+                        return;
+                    }
+                    if (usedDriveLetters.has(driveLetter)) {
+                        alert(`Duplicate drive letter ${driveLetter} in mapping ${i + 1}. Each mapping must use a unique drive letter.`);
+                        return;
+                    }
+                    usedDriveLetters.add(driveLetter);
+
+                    if (!networkPath.match(/^\\\\[a-zA-Z0-9.-]+\\[^\\]+(\\[^\\]+)*$/)) {
+                        alert(`Invalid network path for mapping ${i + 1}. Please enter a valid path (e.g., \\srvdc01.company.local\\company\\share).`);
+                        return;
+                    }
+                    if (groupName && !groupName.match(/^[a-zA-Z0-9\s_-]+$/)) {
+                        alert(`Invalid group name for mapping ${i + 1}. Use letters, numbers, spaces, underscores, or hyphens only.`);
+                        return;
+                    }
+                    if (!['DomainAuthenticated', 'Public', 'Private'].includes(profileName)) {
+                        alert(`Invalid profile name for mapping ${i + 1}. Please select a valid profile.`);
+                        return;
+                    }
+                    if (domainSuffix && !domainSuffix.match(/^[a-zA-Z0-9.-]+$/)) {
+                        alert(`Invalid domain suffix for mapping ${i + 1}. Use letters, numbers, dots, or hyphens only (e.g., company.local).`);
+                        return;
+                    }
+
+                    mappings.push({ driveLetter, networkPath, groupName, profileName, domainSuffix });
                 }
-                if (groupName && !groupName.match(/^[a-zA-Z0-9\s_-]+$/)) {
-                    alert(`Invalid group name for mapping ${i + 1}. Use letters, numbers, spaces, underscores, or hyphens only.`);
-                    return;
-                }
-                if (!['DomainAuthenticated', 'Public', 'Private'].includes(profileName)) {
-                    alert(`Invalid profile name for mapping ${i + 1}. Please select a valid profile.`);
-                    return;
-                }
-                if (domainSuffix && !domainSuffix.match(/^[a-zA-Z0-9.-]+$/)) {
-                    alert(`Invalid domain suffix for mapping ${i + 1}. Use letters, numbers, dots, or hyphens only (e.g., company.local).`);
+
+                if (mappings.length === 0) {
+                    alert('Please provide at least one valid mapping.');
                     return;
                 }
 
-                mappings.push({ driveLetter, networkPath, groupName, profileName, domainSuffix });
+                const scriptContent = getDriveMappingScriptContent(mappings, removeAllDrives);
+
+                const blob = new Blob([scriptContent], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'MapDrives.ps1';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (err) {
+                alert('Error generating PowerShell script: ' + err.message);
             }
-
-            if (mappings.length === 0) {
-                alert('Please provide at least one valid mapping.');
-                return;
-            }
-
-            const scriptContent = getDriveMappingScriptContent(mappings, removeAllDrives);
-
-            const blob = new Blob([scriptContent], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'MapDrives.ps1';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
         }
 
         function generateIntuneScript() {
-            const removeAllDrives = document.getElementById('removeAllDrives').checked;
-            const mappings = [];
-            const usedDriveLetters = new Set();
-            const reservedDriveLetters = ['A', 'B', 'C'];
+            try {
+                const removeAllDrives = document.getElementById('removeAllDrives')?.checked || false;
+                const mappings = [];
+                const usedDriveLetters = new Set();
+                const reservedDriveLetters = ['A', 'B', 'C'];
 
-            for (let i = 0; i < mappingCount; i++) {
-                const driveLetter = document.getElementById(`driveLetter_${i}`)?.value.trim().toUpperCase();
-                const networkPath = document.getElementById(`networkPath_${i}`)?.value.trim();
-                const groupName = document.getElementById(`groupName_${i}`)?.value.trim();
-                const profileName = document.getElementById(`profileName_${i}`)?.value;
-                const domainSuffix = document.getElementById(`domainSuffix_${i}`)?.value.trim();
+                for (let i = 0; i < mappingCount; i++) {
+                    const driveLetterInput = document.getElementById(`driveLetter_${i}`);
+                    const networkPathInput = document.getElementById(`networkPath_${i}`);
+                    const groupNameInput = document.getElementById(`groupName_${i}`);
+                    const profileNameInput = document.getElementById(`profileName_${i}`);
+                    const domainSuffixInput = document.getElementById(`domainSuffix_${i}`);
 
-                if (!driveLetter || !networkPath) continue;
+                    if (!driveLetterInput || !networkPathInput || !profileNameInput) continue;
 
-                if (!driveLetter.match(/^[A-Z]$/)) {
-                    alert(`Invalid drive letter for mapping ${i + 1}. Please enter a single letter (e.g., G).`);
+                    const driveLetter = driveLetterInput.value.trim().toUpperCase();
+                    const networkPath = networkPathInput.value.trim();
+                    const groupName = groupNameInput.value.trim();
+                    const profileName = profileNameInput.value;
+                    const domainSuffix = domainSuffixInput.value.trim();
+
+                    if (!driveLetter || !networkPath) continue;
+
+                    if (!driveLetter.match(/^[A-Z]$/)) {
+                        alert(`Invalid drive letter for mapping ${i + 1}. Please enter a single letter (e.g., G).`);
+                        return;
+                    }
+                    if (reservedDriveLetters.includes(driveLetter)) {
+                        alert(`Drive letter ${driveLetter} is reserved (A, B, C). Please choose another letter for mapping ${i + 1}.`);
+                        return;
+                    }
+                    if (usedDriveLetters.has(driveLetter)) {
+                        alert(`Duplicate drive letter ${driveLetter} in mapping ${i + 1}. Each mapping must use a unique drive letter.`);
+                        return;
+                    }
+                    usedDriveLetters.add(driveLetter);
+
+                    if (!networkPath.match(/^\\\\[a-zA-Z0-9.-]+\\[^\\]+(\\[^\\]+)*$/)) {
+                        alert(`Invalid network path for mapping ${i + 1}. Please enter a valid path (e.g., \\srvdc01.company.local\\company\\share).`);
+                        return;
+                    }
+                    if (groupName && !groupName.match(/^[a-zA-Z0-9\s_-]+$/)) {
+                        alert(`Invalid group name for mapping ${i + 1}. Use letters, numbers, spaces, underscores, or hyphens only.`);
+                        return;
+                    }
+                    if (!['DomainAuthenticated', 'Public', 'Private'].includes(profileName)) {
+                        alert(`Invalid profile name for mapping ${i + 1}. Please select a valid profile.`);
+                        return;
+                    }
+                    if (domainSuffix && !domainSuffix.match(/^[a-zA-Z0-9.-]+$/)) {
+                        alert(`Invalid domain suffix for mapping ${i + 1}. Use letters, numbers, dots, or hyphens only (e.g., company.local).`);
+                        return;
+                    }
+
+                    mappings.push({ driveLetter, networkPath, groupName, profileName, domainSuffix });
+                }
+
+                if (mappings.length === 0) {
+                    alert('Please provide at least one valid mapping.');
                     return;
                 }
-                if (reservedDriveLetters.includes(driveLetter)) {
-                    alert(`Drive letter ${driveLetter} is reserved (A, B, C). Please choose another letter for mapping ${i + 1}.`);
-                    return;
-                }
-                if (usedDriveLetters.has(driveLetter)) {
-                    alert(`Duplicate drive letter ${driveLetter} in mapping ${i + 1}. Each mapping must use a unique drive letter.`);
-                    return;
-                }
-                usedDriveLetters.add(driveLetter);
 
-                if (!networkPath.match(/^\\\\[a-zA-Z0-9.-]+\\[^\\]+(\\[^\\]+)*$/)) {
-                    alert(`Invalid network path for mapping ${i + 1}. Please enter a valid path (e.g., \\srvdc01.company.local\\company\\share).`);
-                    return;
-                }
-                if (groupName && !groupName.match(/^[a-zA-Z0-9\s_-]+$/)) {
-                    alert(`Invalid group name for mapping ${i + 1}. Use letters, numbers, spaces, underscores, or hyphens only.`);
-                    return;
-                }
-                if (!['DomainAuthenticated', 'Public', 'Private'].includes(profileName)) {
-                    alert(`Invalid profile name for mapping ${i + 1}. Please select a valid profile.`);
-                    return;
-                }
-                if (domainSuffix && !domainSuffix.match(/^[a-zA-Z0-9.-]+$/)) {
-                    alert(`Invalid domain suffix for mapping ${i + 1}. Use letters, numbers, dots, or hyphens only (e.g., company.local).`);
-                    return;
-                }
+                const driveMappingScript = getDriveMappingScriptContent(mappings, removeAllDrives);
+                const base64Script = btoa(driveMappingScript);
 
-                mappings.push({ driveLetter, networkPath, groupName, profileName, domainSuffix });
-            }
-
-            if (mappings.length === 0) {
-                alert('Please provide at least one valid mapping.');
-                return;
-            }
-
-            const driveMappingScript = getDriveMappingScriptContent(mappings, removeAllDrives);
-            const base64Script = btoa(driveMappingScript);
-
-            const intuneScriptContent = `
+                const intuneScriptContent = `
 # Check if running in SYSTEM context
 $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 if ($currentUser -eq "NT AUTHORITY\\SYSTEM") {
@@ -509,7 +555,7 @@ if ($currentUser -eq "NT AUTHORITY\\SYSTEM") {
         $acl.SetAccessRuleProtection($true, $false)
         $rule = New-Object System.Security.AccessControl.FileSystemAccessRule("NT AUTHORITY\\SYSTEM", "FullControl", "Allow")
         $acl.AddAccessRule($rule)
-        $rule = Newhabi-Object System.Security.AccessControl.FileSystemAccessRule("Administrators", "FullControl", "Allow")
+        $rule = New-Object System.Security.AccessControl.FileSystemAccessRule("Administrators", "FullControl", "Allow")
         $acl.AddAccessRule($rule)
         Set-Acl $scriptPath $acl
         Write-Host "Drive mapping script saved to $scriptPath"
@@ -517,7 +563,7 @@ if ($currentUser -eq "NT AUTHORITY\\SYSTEM") {
         # Create a scheduled task to run the drive mapping script at user logon
         $taskName = "DriveMappingTask"
         $taskDescription = "Runs drive mapping script at user logon"
-        $action = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File \\"$scriptPath\\"" -WorkingDirectory $scriptDir
+        $action = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File \\"$scriptPath\\""
         $trigger = New-ScheduledTaskTrigger -AtLogOn
         $principal = New-ScheduledTaskPrincipal -GroupId "Users" -RunLevel Limited
         $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
@@ -536,15 +582,18 @@ else {
 }
 `;
 
-            const blob = new Blob([intuneScriptContent], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'IntuneDriveMap.ps1';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+                const blob = new Blob([intuneScriptContent], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'IntuneDriveMap.ps1';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (err) {
+                alert('Error generating Intune script: ' + err.message);
+            }
         }
     </script>
     <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'93eceac0a8dc7bbd',t:'MTc0NzA4NDM3NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
