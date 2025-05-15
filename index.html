@@ -37,7 +37,51 @@
         }
         return gk_fileData[filename] || "";
         }
-        </script><!DOCTYPE html>
+        </script><script type="text/javascript">
+    var gk_isXlsx = false;
+    var gk_xlsxFileLookup = {};
+    var gk_fileData = {};
+    function filledCell(cell) {
+        return cell !== '' && cell != null;
+    }
+    function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            if (typeof XLSX === 'undefined') {
+                console.error('XLSX library is not loaded.');
+                return "";
+            }
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                    row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                    headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex));
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error('Error processing XLSX file:', e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+    }
+</script>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -92,51 +136,6 @@
         <button onclick="generateScript()" class="mt-4 w-full bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500">Download PowerShell Script</button>
         <button onclick="generateIntuneScript()" class="mt-4 w-full bg-indigo-500 text-white p-2 rounded-md hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500">Download Intune Script</button>
     </div>
-
-    <script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-            return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-            if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-                if (typeof XLSX === 'undefined') {
-                    console.error('XLSX library is not loaded.');
-                    return "";
-                }
-                try {
-                    var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                    var firstSheetName = workbook.SheetNames[0];
-                    var worksheet = workbook.Sheets[firstSheetName];
-
-                    // Convert sheet to JSON to filter blank rows
-                    var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                    // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                    var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                    // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                    var headerRowIndex = filteredData.findIndex((row, index) =>
-                        row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                    );
-                    // Fallback
-                    if (headerRowIndex === -1 || headerRowIndex > 25) {
-                        headerRowIndex = 0;
-                    }
-
-                    // Convert filtered JSON back to CSV
-                    var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex));
-                    csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                    return csv;
-                } catch (e) {
-                    console.error('Error processing XLSX file:', e);
-                    return "";
-                }
-            }
-            return gk_fileData[filename] || "";
-        }
-    </script>
 
     <script>
         let mappingCount = 1;
@@ -646,18 +645,16 @@ if ($currentUser -eq "NT AUTHORITY\\SYSTEM") {
         Write-EventLog -LogName Application -Source $EventSource -EntryType Information -EventId 1003 -Message "Drive mapping script saved to $scriptPath"
         Write-EventLog -LogName Application -Source $EventSource -EntryType Information -EventId 1008 -Message "Granted ReadAndExecute permissions to Users for $scriptPath"
 
-        # Create a scheduled task to run the drive mapping script at user logon and on network connection
+        # Create a scheduled task to run the drive mapping script at user logon
         $taskName = "DriveMappingTask"
-        $taskDescription = "Runs drive mapping script at user logon and on network connection"
+        $taskDescription = "Runs drive mapping script at user logon"
         $action = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File 'C:\\ProgramData\\DriveMapper\\DriveMap.ps1'"
-        $logonTrigger = New-ScheduledTaskTrigger -AtLogOn
-        $eventTrigger = New-ScheduledTaskTrigger -OnEvent -EventSubscription "<QueryList><Query Id='0' Path='Microsoft-Windows-NetworkProfile/Operational'><Select Path='Microsoft-Windows-NetworkProfile/Operational'>*[System[(EventID=10000)]]</Select></Query></QueryList>"
-        $triggers = @($logonTrigger, $eventTrigger)
+        $trigger = New-ScheduledTaskTrigger -AtLogOn
         $principal = New-ScheduledTaskPrincipal -GroupId "Users" -RunLevel Limited
         $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
 
         # Register the scheduled task
-        Register-ScheduledTask -TaskName $taskName -Description $taskDescription -Action $action -Trigger $triggers -Principal $principal -Settings $settings -Force
+        Register-ScheduledTask -TaskName $taskName -Description $taskDescription -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force
         Write-EventLog -LogName Application -Source $EventSource -EntryType Information -EventId 1004 -Message "Scheduled task '$taskName' created successfully"
         Write-Host "Scheduled task '$taskName' created successfully"
     }
