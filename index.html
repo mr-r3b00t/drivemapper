@@ -306,7 +306,7 @@ ${mappings.map((mapping, index) => `    @{ DriveLetter = "${mapping.driveLetter}
 foreach ($mapping in $mappings) {
     Write-EventLog -LogName Application -Source $EventSource -EntryType Information -EventId 2004 -Message "Processing drive mapping for $($mapping.DriveLetter): to $($mapping.NetworkPath)"
 
-    # Check if the network profile matches the specified profile, if set
+    # Check if the network profile matches the specified profile, if set; skip if ProfileName is empty
     if ($mapping.ProfileName -and -not ((Get-NetConnectionProfile).NetworkCategory -contains $mapping.ProfileName)) {
         Write-EventLog -LogName Application -Source $EventSource -EntryType Warning -EventId 2014 -Message "Network profile is not $($mapping.ProfileName). Drive $($mapping.DriveLetter): not mapped."
         Write-Host "Network profile is not $($mapping.ProfileName). Drive $($mapping.DriveLetter): not mapped."
@@ -456,7 +456,7 @@ Write-EventLog -LogName Application -Source $EventSource -EntryType Information 
 
                 for (let i = 0; i < mappingCount; i++) {
                     const driveLetterInput = document.getElementById(`driveLetter_${i}`);
-                    const networkPathInput = document.getElementById(`networkPath_${i}`);
+                    const networkPathInput = document.getElementById(`driveLetter_${i}`);
                     const groupNameInput = document.getElementById(`groupName_${i}`);
                     const profileNameInput = document.getElementById(`profileName_${i}`);
                     const domainSuffixInput = document.getElementById(`domainSuffix_${i}`);
