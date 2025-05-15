@@ -69,9 +69,10 @@
                     <input type="text" id="groupName_0" placeholder="e.g., Domain Users" class="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div class="mb-4">
-                    <label for="profileName_0" class="block text-sm font-medium text-gray-700">Network Profile</label>
+                    <label for="profileName_0" class="block text-sm font-medium text-gray-700">Network Profile (Optional)</label>
                     <select id="profileName_0" class="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="DomainAuthenticated" selected>DomainAuthenticated</option>
+                        <option value="" selected>Not Set</option>
+                        <option value="DomainAuthenticated">DomainAuthenticated</option>
                         <option value="Public">Public</option>
                         <option value="Private">Private</option>
                     </select>
@@ -163,8 +164,9 @@
                     <input type="text" id="groupName_${mappingCount}" placeholder="e.g., Domain Users" value="${data.groupName || ''}" class="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div class="mb-4">
-                    <label for="profileName_${mappingCount}" class="block text-sm font-medium text-gray-700">Network Profile</label>
+                    <label for="profileName_${mappingCount}" class="block text-sm font-medium text-gray-700">Network Profile (Optional)</label>
                     <select id="profileName_${mappingCount}" class="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="" ${data.profileName === '' ? 'selected' : ''}>Not Set</option>
                         <option value="DomainAuthenticated" ${data.profileName === 'DomainAuthenticated' ? 'selected' : ''}>DomainAuthenticated</option>
                         <option value="Public" ${data.profileName === 'Public' ? 'selected' : ''}>Public</option>
                         <option value="Private" ${data.profileName === 'Private' ? 'selected' : ''}>Private</option>
@@ -252,7 +254,7 @@
                                 driveLetter: mapping.driveLetter || '',
                                 networkPath: mapping.networkPath || '',
                                 groupName: mapping.groupName || '',
-                                profileName: mapping.profileName || 'DomainAuthenticated',
+                                profileName: mapping.profileName || '',
                                 domainSuffix: mapping.domainSuffix || ''
                             });
                         }
@@ -298,15 +300,14 @@ catch {
 }
 ` : ''}# Define mappings
 $mappings = @(
-${mappings.map((mapping, index) => `    @{ DriveLetter = "${mapping.driveLetter}"; NetworkPath = "${mapping.networkPath}"; GroupName = "${mapping.groupName || 'Domain Users'}"; ProfileName = "${mapping.profileName}"; DomainSuffix = "${mapping.domainSuffix || ''}" }${index < mappings.length - 1 ? ',' : ''}`).join('\n')}
+${mappings.map((mapping, index) => `    @{ DriveLetter = "${mapping.driveLetter}"; NetworkPath = "${mapping.networkPath}"; GroupName = "${mapping.groupName || 'Domain Users'}"; ProfileName = "${mapping.profileName || ''}"; DomainSuffix = "${mapping.domainSuffix || ''}" }${index < mappings.length - 1 ? ',' : ''}`).join('\n')}
 )
 
 foreach ($mapping in $mappings) {
     Write-EventLog -LogName Application -Source $EventSource -EntryType Information -EventId 2004 -Message "Processing drive mapping for $($mapping.DriveLetter): to $($mapping.NetworkPath)"
 
-    # Check if the network profile matches the specified profile
-    $networkProfiles = (Get-NetConnectionProfile).NetworkCategory
-    if (-not ($networkProfiles -contains $mapping.ProfileName)) {
+    # Check if the network profile matches the specified profile, if set
+    if ($mapping.ProfileName -and -not ((Get-NetConnectionProfile).NetworkCategory -contains $mapping.ProfileName)) {
         Write-EventLog -LogName Application -Source $EventSource -EntryType Warning -EventId 2014 -Message "Network profile is not $($mapping.ProfileName). Drive $($mapping.DriveLetter): not mapped."
         Write-Host "Network profile is not $($mapping.ProfileName). Drive $($mapping.DriveLetter): not mapped."
         continue
@@ -460,13 +461,13 @@ Write-EventLog -LogName Application -Source $EventSource -EntryType Information 
                     const profileNameInput = document.getElementById(`profileName_${i}`);
                     const domainSuffixInput = document.getElementById(`domainSuffix_${i}`);
 
-                    if (!driveLetterInput || !networkPathInput || !profileNameInput) continue;
+                    if (!driveLetterInput || !networkPathInput) continue;
 
                     const driveLetter = driveLetterInput.value.trim().toUpperCase();
                     const networkPath = networkPathInput.value.trim();
-                    const groupName = groupNameInput.value.trim();
-                    const profileName = profileNameInput.value;
-                    const domainSuffix = domainSuffixInput.value.trim();
+                    const groupName = groupNameInput?.value.trim() || '';
+                    const profileName = profileNameInput?.value || '';
+                    const domainSuffix = domainSuffixInput?.value.trim() || '';
 
                     if (!driveLetter || !networkPath) continue;
 
@@ -491,10 +492,6 @@ Write-EventLog -LogName Application -Source $EventSource -EntryType Information 
                     }
                     if (groupName && !groupName.match(/^[a-zA-Z0-9\s_-]+$/)) {
                         alert(`Invalid group name for mapping ${i + 1}. Use letters, numbers, spaces, underscores, or hyphens only.`);
-                        return;
-                    }
-                    if (!['DomainAuthenticated', 'Public', 'Private'].includes(profileName)) {
-                        alert(`Invalid profile name for mapping ${i + 1}. Please select a valid profile.`);
                         return;
                     }
                     if (domainSuffix && !domainSuffix.match(/^[a-zA-Z0-9.-]+$/)) {
@@ -540,13 +537,13 @@ Write-EventLog -LogName Application -Source $EventSource -EntryType Information 
                     const profileNameInput = document.getElementById(`profileName_${i}`);
                     const domainSuffixInput = document.getElementById(`domainSuffix_${i}`);
 
-                    if (!driveLetterInput || !networkPathInput || !profileNameInput) continue;
+                    if (!driveLetterInput || !networkPathInput) continue;
 
                     const driveLetter = driveLetterInput.value.trim().toUpperCase();
                     const networkPath = networkPathInput.value.trim();
-                    const groupName = groupNameInput.value.trim();
-                    const profileName = profileNameInput.value;
-                    const domainSuffix = domainSuffixInput.value.trim();
+                    const groupName = groupNameInput?.value.trim() || '';
+                    const profileName = profileNameInput?.value || '';
+                    const domainSuffix = domainSuffixInput?.value.trim() || '';
 
                     if (!driveLetter || !networkPath) continue;
 
@@ -571,10 +568,6 @@ Write-EventLog -LogName Application -Source $EventSource -EntryType Information 
                     }
                     if (groupName && !groupName.match(/^[a-zA-Z0-9\s_-]+$/)) {
                         alert(`Invalid group name for mapping ${i + 1}. Use letters, numbers, spaces, underscores, or hyphens only.`);
-                        return;
-                    }
-                    if (!['DomainAuthenticated', 'Public', 'Private'].includes(profileName)) {
-                        alert(`Invalid profile name for mapping ${i + 1}. Please select a valid profile.`);
                         return;
                     }
                     if (domainSuffix && !domainSuffix.match(/^[a-zA-Z0-9.-]+$/)) {
